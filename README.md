@@ -9,6 +9,7 @@ A large array of urban activities including mobility can be modeled as networks 
 <img src="pipeline.png" width="520" height="250" />
 
 **Result**
+
 | city    | Method                             | GMM Component | GMM Threshold      | Balanced ACC      | National Holiday TPR | Culture Event TPR  | Extreme Weather TPR |
 |---------|------------------------------------|---------------|--------------------|-------------------|----------------------|--------------------|---------------------|
 | Taipei  | Comm + PCA + GMM                   | 2             | 0.2                | 0.865540789959395 | 1                    | 1                  | 0.2                 |
