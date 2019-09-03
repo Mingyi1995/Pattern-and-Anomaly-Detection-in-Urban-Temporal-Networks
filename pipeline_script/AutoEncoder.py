@@ -25,7 +25,7 @@ from IPython.display import clear_output
 
 
 RecordWritingPath = ''
-TransportationDataPath = '/Users/hemingyi/Dropbox/quziyin/transportation/'
+TransportationDataPath = '/Users/hemingyi/Documents/capstone/post/transportation/'
 EventDataPath = '/Users/hemingyi/Dropbox/quziyin/event data/update/'
 # comboPath = '/Users/hemingyi/Documents/capstone/combo/'
 # dataFile = TransportationDataPath+city+'EdgeYearwiseAggregated.csv'
@@ -59,7 +59,7 @@ def preprocessComm(df_comm):
     # convert data from long to wide
     print('dataframe pivot')
     df_main = df_comm.pivot(index = 'date', columns = 'ID', values ='amount')
-
+    df_main = df_main.sort_index()
     # fill missing value
     df_main.fillna(0, inplace = True)
     # scale all the columns
@@ -202,8 +202,8 @@ def autoencoderOutput(df_comm):
     import torch.nn as nn
     import torch.utils.data
     
-    print('2. Preprocessing input.')
-    df_comm = preprocessComm(df_comm)
+    # print('2. Preprocessing input.')
+    # df_comm = preprocessComm(df_comm)
     
     print('3. Augmenting training data.')
     agTrain_setI, agTrain_setO = augmentData(df_comm)
@@ -219,142 +219,25 @@ def autoencoderOutput(df_comm):
     return tr_output
 
 
-# In[66]:
 
 
-def getTimeSeries(df):
-    table = pd.pivot_table(df, values='amount', index=['date'],
-                    columns=['start_id','end_id'], aggfunc=np.sum, fill_value=0)
-    return table
-
-
-# In[67]:
-
-
-# import events data
-def getEvents(EventDataPath,city):
-    events_data =EventDataPath+city+'Events.csv'
-    df_events = pd.read_csv(events_data, encoding = "ISO-8859-1", parse_dates=['Date'], infer_datetime_format=True)
-
-    # dataframe for events
-    df_finalEvents =  df_events[['Date', 'Type']]
-
-    # list events
-    lis_event = df_finalEvents['Type'].unique()
-    lis_event = list(lis_event)
-    return (lis_event,df_finalEvents)
-
-
-# In[68]:
-
-
-def anomalyDetection(y,ncomp,pval = 0.2,iterN=20):
-    #index of regular (non-outlier points)
-    #rind=y[:,0]>-10 
-    rind = np.array(range(y.shape[0]))
-    
-    #clustering model
-    gm=GaussianMixture(n_components=ncomp,n_init=100,max_iter=1000,random_state=0) 
-    for i in range(iterN): #iterate
-#         print('Iteration {}'.format(i+1))  
-        clustering=gm.fit(y[rind,:]) #fit EM clustering model excluding outliers
-        l=clustering.score_samples(y) #estimate likelihood for each point
-        Lthres=sorted(l)[int(len(l)*pval)] #anomaly threshold
-        rind0=0+rind
-        rind=l>Lthres #non-anomalous points
-        if all(rind==rind0):
-#             print('Convergence in {} iterations'.format(i+1))
-            break
-    return l < Lthres
-
-
-# In[69]:
-
-
-def pipeline(city, community=False):
-    f = open(RecordWritingPath+'0709.csv', 'a+')
+def pipeline(city, raw, standard):
     print('Initialize')
-    lis_event,df_finalEvents = getEvents(EventDataPath,city)
-#     data = readCommdata(city,TransportationDataPath)
-    
-#     dataTs = getTimeSeries(data)
-    if community:
-        df_comm = pd.read_csv(TransportationDataPath+'Comm/'+city+'DateWiseComm.csv')
-        del df_comm['Unnamed: 0']
-    else:
-        df_comm = pd.read_csv(TransportationDataPath+city+'EdgeDatewiseAggregated.csv')
-        
-    dateData = getTimeSeries(df_comm)
-    dataTs = pd.DataFrame(autoencoderOutput(df_comm))
-    matrix = dataTs.values
-    matrix = np.log(matrix+1)
-#     pca = PCA(n_components=PCAncomp)
-#     matrix=pca.fit_transform(matrix)
-    for i in range(matrix.shape[1]):
-        matrix[:, i] = (matrix[:, i] - matrix[:, i].min()) / (matrix[:, i].max() - matrix[:, i].min())
-    date = dateData.index.to_frame().rename(columns={'date':'Date'})
-    threresult = {}
-    EventsDF = df_finalEvents['Date'].drop_duplicates().to_frame()
-    EventsDF['Anomaly'] = True
-    EventsDF['Date'] = EventsDF['Date'].astype('str')
-    date['Date'] = date['Date'].astype('str')
-    df = EventsDF.merge(date,on='Date',how='right')
-    df.fillna(False,inplace=True)
-    for comp in [1,2,3,4,5]:
-        print('n_component',comp)
-        for thres in range(1,10, 1):
-            th = thres/10
-    #         print("Threshhold: ",th)
-            outliers = anomalyDetection(matrix,comp,pval = th)
-            df['outlier'] = outliers
-            TP = len(df[(df['outlier']==True)&(df['Anomaly']==True)])
-            FP = len(df[(df['outlier']==True)&(df['Anomaly']==False)])
-            TN = len(df[(df['outlier']==False)&(df['Anomaly']==False)])
-            FN = len(df[(df['outlier']==False)&(df['Anomaly']==True)])
-            if community:
-                f.write(city+',Auto Encoder + Community detection,'+str(comp)+','+str(th)+','+str(TP)+','+str(FP)+','+str(TN)+','+str(FN)+',')
-            else:
-                f.write(city+',Auto Encoder,'+str(comp)+','+str(th)+','+str(TP)+','+str(FP)+','+str(TN)+','+str(FN)+',')
-#             print(city+',Comm + GMM,'+str(comp)+','+str(th)+','+str(TP)+','+str(FP)+','+str(TN)+','+str(FN)+',')
-            for event in ['National Holiday', 'Culture Event', 'Extreme Weather']:
-    #             print(event)
-                SingleEventDF = df_finalEvents[df_finalEvents['Type'] == event]
-                SingleEventDF = SingleEventDF.drop_duplicates()
-                SingleEventDF['Date'] = SingleEventDF['Date'].astype('str')
-                SingleDF = date.merge(SingleEventDF, on='Date', how='left')
+    data =  pd.read_csv(TransportationDataPath+'Output/'+raw+'/OriginSize/'+standard+'/'+city+raw+standard+'.csv', date_parser='date')
+    date = data['date']
+    del data['date']
+    dataTs = pd.DataFrame(autoencoderOutput(data))
+    dataTs['date'] = date
+    dataTs.to_csv(TransportationDataPath+'Output/'+raw+'/AE/'+standard+'/'+city+raw+standard+'.csv', index=False)
 
-            #     SingleDF = SingleEventDF.merge(date,on='Date',how='left')
-                SingleDF['outliers'] = outliers
-            #     SinglePrecision = len(SingleDF[(SingleDF['outlier']==True)&(SingleDF['Type'].notnull)])/len(SingleDF[SingleDF['outlier']==True])
-                SingleRecall = len(SingleDF[(SingleDF['outliers']==True)&(SingleDF['Type'].notnull())])/len(SingleEventDF)
-                SingleFPR = len(SingleDF[(SingleDF['outliers']==True)&(SingleDF['Type'].isna())])/len(SingleDF[SingleDF['Type'].isna()])
-                f.write(str(SingleRecall)+',')
-            f.write('\n')
-    f.close()
+city = input('input city: ')
+raw = input('input raw: Comm, IO ')
+standard = input('standard: Normalize, Whiten, Both ')
+pipeline(city, raw, standard)
 
 
-# In[70]:
-# print('Taipei, autoencoder')
-# pipeline('Taipei', False)
-# print('Taipei, autoencoder')
-pipeline('Taipei',True)
 
 
-# print('NewYork, autoencoder')
-# pipeline('NewYork',False)
-
-
-# print('Chicago autoencoder')
-# pipeline('Chicago',False)
-
-# print('DC autoencoder')
-# pipeline('DC',False)
-
-
-# # In[ ]:
-# for city in ['DC', 'Taipei', 'NewYork', 'Chicago']:
-#     print(city, 'autoencoder + community detection')
-#     pipeline(city, True)
 
 
 
