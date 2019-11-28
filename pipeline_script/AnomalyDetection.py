@@ -85,57 +85,53 @@ def getEvents(EventDataPath,city):
 
     # dataframe for events
     df_finalEvents =  df_events[['Date', 'Type']]
-    #df_finalEvents = df_finalEvents[df_finalEvents.Type == 'National Holiday']
-    # list events666
-    
-    lis_event = df_finalEvents['Type'].unique()
-    lis_event = list(lis_event)
     
     df_finalEvents['National Holiday'] = False
-    df_finalEvents['Extrem Weather'] = False
+    df_finalEvents['Extreme Weather'] = False
     df_finalEvents['Culture Event'] = False
     df_finalEvents.loc[df_finalEvents['Type'] == 'National Holiday', 'National Holiday'] = True
-    df_finalEvents.loc[df_finalEvents['Type'] == 'Extrem Weather', 'Extrem Weather'] = True
+    df_finalEvents.loc[df_finalEvents['Type'] == 'Extreme Weather', 'Extreme Weather'] = True
     df_finalEvents.loc[df_finalEvents['Type'] == 'Culture Event', 'Culture Event'] = True
 
     df_finalEvents = df_finalEvents.groupby(['Date']).sum()
     df_finalEvents['Anomaly'] = True
     df_finalEvents.reset_index(inplace=True)
     
-    return (lis_event,df_finalEvents)
-
-
-# In[91]:
-
-
-lis_event,df_finalEvents = getEvents(EventDataPath, 'DC')
-
-
-# In[93]:
+    return df_finalEvents
 
 
 def AnomalyDetectionPipeline(aggregation, dimension, standardize, city):
     data = pd.read_csv(TransportationDataPath+'%s/%s/%s/%s%s%s.csv'%(aggregation, dimension, standardize, city, aggregation, standardize))
     matrix = data.drop(['date'], axis=1).values
-    lis_event,EventsDF = getEvents(EventDataPath,city)
+    EventsDF = getEvents(EventDataPath,city)
     date = data.date.to_frame().rename(columns={'date':'Date'})
     threresult = {}
     EventsDF['Date'] = EventsDF['Date'].astype('str')
     date['Date'] = date['Date'].astype('str')
     df = date.merge(EventsDF,on='Date',how='left')
-    df.Anomaly.fillna(False, inplace=True)
+    df = df.fillna(False)
+    df.replace([2.0,1.0,0.0],[True, True, False])
     for comp in [1,2,3,4,5]:
-        print('n_component',comp)
-        for thres in list(range(1,10,1))+[10*len(df[df['Anomaly']==True])/len(df)]:
-            th = thres/10
-            outliers = anomalyDetection(matrix,comp,pval = th)
-            df['%s-%s'%(comp,th)] = outliers
-    df.to_csv(RecordWritingPath+'%s%s%s%.csv'%(city,aggregation,dimension,standardize),index=False)
+        for th in np.arange(0,1,0.01):
+        	th = round(th,2)
+        	print("\r",'GMM Parameter: %s-%s'%(comp,th),end="",flush=True)
+	        outliers = anomalyDetection(matrix,comp,pval = th)
+	        df['%s-%s'%(comp,th)] = outliers
+    df.to_csv(RecordWritingPath+'AnomalyDetectionResult1006/'+'%s%s%s%s.csv'%(city,aggregation,dimension,standardize),index=False)
 
-standardize = input('input standardize method, Normalize, Whiten, Both: ')
-for aggregation in ['Comm', 'IO']:
-    for dimension in ['PCA', 'AE']:
-        for city in ['Taipei', 'NewYork', 'DC']:
-            print(aggregation, dimension, standardize, city)
-            AnomalyDetectionPipeline(aggregation, dimension, standardize, city)
+
+
+# AnomalyDetectionPipeline('Comm', 'PCA', 'Whiten', 'Taipei')
+standardize = 'Normalize'
+city = input('city: ')
+for aggregation in ['Comm','IO']:
+    for dimension in ['OriginSize','PCA','AE']:
+        print(aggregation, dimension, standardize, city)
+        AnomalyDetectionPipeline(aggregation, dimension, standardize, city)
+
+
+# for standardize in ['Normalize', 'Whiten', 'Both']:
+#     for city in ['Taipei', 'NewYork', 'DC']:
+
+#         AnomalyDetectionPipeline('Comm', 'OriginSize', standardize, city)
 
