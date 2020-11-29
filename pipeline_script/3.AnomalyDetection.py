@@ -20,13 +20,14 @@ warnings.filterwarnings('ignore')
 # In[8]:
 
 
-RecordWritingPath = '/Users/hemingyi/Documents/capstone/post/result/'
-TransportationDataPath = '/Users/hemingyi/Documents/capstone/post/transportation/output/'
-EventDataPath = '/Users/hemingyi/Documents/capstone/post/events/'
-comboPath = '/Users/hemingyi/Documents/capstone/combo/'
-PostData = '/Users/hemingyi/Documents/capstone/post/'
+RecordWritingPath = '../result/'
+TransportationDataPath = '../transportation/output/'
+EventDataPath = '../events/'
+comboPath = '../combo/'
 # dataFile = TransportationDataPath+city+'EdgeYearwiseAggregated.csv'
 
+if os.path.exists(RecordWritingPath+'AnomalyDetectionResult') == False:
+	os.makedirs(RecordWritingPath+'AnomalyDetectionResult')
 
 # In[9]:
 
@@ -101,7 +102,10 @@ def getEvents(EventDataPath,city):
 
 
 def AnomalyDetectionPipeline(aggregation, dimension, standardize, city):
-    data = pd.read_csv(TransportationDataPath+'%s/%s/%s/%s%s%s.csv'%(aggregation, dimension, standardize, city, aggregation, standardize))
+    if aggregation == 'Timeseries':
+        data = pd.read_csv(TransportationDataPath+city+'Timeseries.csv')
+    else:
+        data = pd.read_csv(TransportationDataPath+'%s/%s/%s/%s%s%s.csv'%(aggregation, dimension, standardize, city, aggregation, standardize))
     matrix = data.drop(['date'], axis=1).values
     EventsDF = getEvents(EventDataPath,city)
     date = data.date.to_frame().rename(columns={'date':'Date'})
@@ -110,28 +114,30 @@ def AnomalyDetectionPipeline(aggregation, dimension, standardize, city):
     date['Date'] = date['Date'].astype('str')
     df = date.merge(EventsDF,on='Date',how='left')
     df = df.fillna(False)
-    df.replace([2.0,1.0,0.0],[True, True, False])
-    for comp in [1,2,3,4,5]:
+    df.replace([3.0,2.0,1.0,0.0],[True,True, True, False])
+    if city == 'Taipei':
+        compRange = [4]
+    elif city == 'NewYork':
+        compRange = [3]
+    for comp in compRange:
         for th in np.arange(0,1,0.01):
         	th = round(th,2)
         	print("\r",'GMM Parameter: %s-%s'%(comp,th),end="",flush=True)
 	        outliers = anomalyDetection(matrix,comp,pval = th)
 	        df['%s-%s'%(comp,th)] = outliers
-    df.to_csv(RecordWritingPath+'AnomalyDetectionResult1006/'+'%s%s%s%s.csv'%(city,aggregation,dimension,standardize),index=False)
+    if aggregation == 'Timeseries':
+        df.to_csv(RecordWritingPath+'AnomalyDetectionResult/'+city+'Timeseries.csv')
+    df.to_csv(RecordWritingPath+'AnomalyDetectionResult/'+'%s%s%s%s.csv'%(city,aggregation,dimension,standardize),index=False)
 
 
 
 # AnomalyDetectionPipeline('Comm', 'PCA', 'Whiten', 'Taipei')
-standardize = 'Normalize'
+standardize = 'Standardize'
 city = input('city: ')
+AnomalyDetectionPipeline('Timeseries', None, None, city)
 for aggregation in ['Comm','IO']:
-    for dimension in ['OriginSize','PCA','AE']:
+    for dimension in ['AE','PCA','OriginSize']:
         print(aggregation, dimension, standardize, city)
         AnomalyDetectionPipeline(aggregation, dimension, standardize, city)
 
-
-# for standardize in ['Normalize', 'Whiten', 'Both']:
-#     for city in ['Taipei', 'NewYork', 'DC']:
-
-#         AnomalyDetectionPipeline('Comm', 'OriginSize', standardize, city)
 

@@ -24,9 +24,9 @@ from IPython.display import clear_output
 # In[64]:
 
 
-RecordWritingPath = ''
-TransportationDataPath = '/Users/hemingyi/Documents/capstone/post/transportation/'
-EventDataPath = '/Users/hemingyi/Dropbox/quziyin/event data/update/'
+RecordWritingPath = '../result/'
+TransportationDataPath = '../transportation/'
+# EventDataPath = '/Users/hemingyi/Dropbox/quziyin/event data/update/'
 # comboPath = '/Users/hemingyi/Documents/capstone/combo/'
 # dataFile = TransportationDataPath+city+'EdgeYearwiseAggregated.csv'
 
@@ -223,16 +223,18 @@ def autoencoderOutput(df_comm):
 
 def pipeline(city, raw, standard):
     print('Initialize')
-    data =  pd.read_csv(TransportationDataPath+'Output/'+raw+'/OriginSize/'+standard+'/'+city+raw+standard+'.csv', date_parser='date')
+    data =  pd.read_csv(TransportationDataPath+'output/'+raw+'/OriginSize/'+standard+'/'+city+raw+standard+'.csv', date_parser='date')
     date = data['date']
     del data['date']
     dataTs = pd.DataFrame(autoencoderOutput(data))
     dataTs['date'] = date
-    dataTs.to_csv(TransportationDataPath+'Output/'+raw+'/AE/'+standard+'/'+city+raw+standard+'.csv', index=False)
+    if os.path.exists(TransportationDataPath+'output/'+raw+'/AE/'+standard) == False:
+        os.makedirs(TransportationDataPath+'output/'+raw+'/AE/'+standard)
+    dataTs.to_csv(TransportationDataPath+'output/'+raw+'/AE/'+standard+'/'+city+raw+standard+'.csv', index=False)
 
 city = input('input city: ')
 raw = input('input raw: Comm, IO ')
-standard = input('standard: Normalize, Whiten, Both ')
+standard = input('standard: Standardize, Whiten, Both ')
 pipeline(city, raw, standard)
 
 
